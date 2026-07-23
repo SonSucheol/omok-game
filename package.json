@@ -1,0 +1,39 @@
+{
+  "name": "omok-game",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "clean": "node -e \"require('fs').rmSync('.next',{recursive:true,force:true})\"",
+    "dev": "node scripts/lan-url.mjs && tsx server.ts",
+    "dev:fresh": "node scripts/dev-fresh.mjs",
+    "dev:public": "concurrently -k -n server,tunnel -c blue,green \"tsx server.ts\" \"node scripts/tunnel.mjs\"",
+    "tunnel": "node scripts/tunnel.mjs",
+    "lan-url": "node scripts/lan-url.mjs",
+    "build": "next build",
+    "start": "tsx server.ts",
+    "lint": "next lint",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "next": "^15.1.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "socket.io": "^4.8.1",
+    "socket.io-client": "^4.8.1"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "^3.2.0",
+    "@types/node": "^22.10.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "eslint": "^9.16.0",
+    "eslint-config-next": "^15.1.0",
+    "postcss": "^8.4.49",
+    "concurrently": "^9.1.2",
+    "tailwindcss": "^3.4.16",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}

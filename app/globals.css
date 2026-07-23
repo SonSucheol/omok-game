@@ -1,0 +1,47 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --board-wood: #c9a45c;
+  --board-line: #5c3d1e;
+  --board-frame: #8b5e2a;
+}
+
+html,
+body {
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  @apply bg-gradient-to-b from-amber-50 to-orange-100 text-stone-800 antialiased;
+}
+
+@layer components {
+  /* 남은 영역 안에서 정사각 보드가 최대 크기로 들어가도록 */
+  .board-slot {
+    container-type: size;
+    flex: 1 1 0%;
+    min-height: 0;
+    min-width: 0;
+    width: 100%;
+    display: grid;
+    place-items: center;
+  }
+
+  .board-frame {
+    width: min(100cqw, 100cqh);
+    max-width: 100%;
+    max-height: 100%;
+    aspect-ratio: 1 / 1;
+  }
+
+  .screen-shell {
+    @apply flex h-dvh max-h-dvh w-full flex-col overflow-hidden;
+  }
+
+  .screen-scroll {
+    @apply min-h-0 flex-1 overflow-y-auto overscroll-contain;
+  }
+}
