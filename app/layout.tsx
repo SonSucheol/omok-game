@@ -6,7 +6,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "오목 | omok-game",
-  description: "카카오 오목 스타일 로컬 2인 오목 게임",
+  description: "로컬·AI·온라인 오목 웹 게임",
 };
 
 export default function RootLayout({

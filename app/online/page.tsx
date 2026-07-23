@@ -129,22 +129,12 @@ export default function OnlineLobbyPage() {
   };
 
   const sendInvite = (opts: { toNickname?: string; toUserId?: string }) => {
-    console.log("[omok:login] sendInvite click", {
-      loggedIn: Boolean(user),
-      nickname: user?.nickname,
-      presenceRegistered,
-      connected,
-      opts,
-    });
-
     if (!user) {
       setError("초대는 로그인이 필요합니다. 우측 상단에서 로그인하세요.");
       return;
     }
     if (!presenceRegistered) {
-      setError(
-        "로그인 presence 등록 중입니다. 우측 하단 상태가 「온라인등록됨」이 된 뒤 다시 초대하세요.",
-      );
+      setError("온라인 등록 중입니다. 잠시 후 다시 시도하세요.");
       return;
     }
     if (!ready || !socket || !connected) {
@@ -160,7 +150,6 @@ export default function OnlineLobbyPage() {
       { playerId, toNickname: opts.toNickname, toUserId: opts.toUserId },
       (response) => {
         setLoading(null);
-        console.log("[omok:invite] send ack", response);
         if (!response.ok || !response.inviteId) {
           setError(actionErrorMessage(response.error, "초대에 실패했습니다."));
           return;
@@ -197,7 +186,7 @@ export default function OnlineLobbyPage() {
               {authLoading
                 ? "로그인 확인 중…"
                 : user
-                  ? `로그인: ${user.nickname}${presenceRegistered ? " · 온라인등록됨" : " · 온라인등록 중…"}`
+                  ? `로그인: ${user.nickname}${presenceRegistered ? "" : " · 연결 준비 중…"}`
                   : "게스트 (친구 초대 불가)"}
             </p>
           </div>
@@ -308,8 +297,8 @@ export default function OnlineLobbyPage() {
 
           {inviteWaiting && (
             <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 sm:text-sm">
-              초대를 보냈습니다. 상대 화면에 수락/거절 팝업(또는 우측 하단
-              「초대 N건」)이 뜹니다. 수락하면 대국실로 이동합니다.
+              초대를 보냈습니다. 상대에게 수락/거절 팝업이 표시되며, 수락하면
+              대국실로 이동합니다.
             </p>
           )}
 
@@ -322,16 +311,14 @@ export default function OnlineLobbyPage() {
             </p>
           )}
 
-          <div className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900 sm:px-4 sm:py-3 sm:text-sm">
-            <p className="font-medium">테스트 방법</p>
-            <ul className="mt-1.5 list-inside list-disc space-y-1 text-amber-800">
+          <div className="rounded-lg bg-stone-100 px-3 py-2 text-xs text-stone-600 sm:px-4 sm:py-3 sm:text-sm">
+            <p className="font-medium text-stone-800">다른 기기에서 접속</p>
+            <ul className="mt-1.5 list-inside list-disc space-y-1">
               <li>
-                <strong>같은 Wi-Fi</strong>:{" "}
-                <code className="rounded bg-white px-1">sslip.io</code> 주소로
-                모바일 접속
+                같은 Wi-Fi: 서버 시작 시 안내되는 주소(또는 sslip.io)로 접속
               </li>
               <li>
-                <strong>다른 네트워크</strong>:{" "}
+                다른 네트워크:{" "}
                 <code className="rounded bg-white px-1">npm run dev:public</code>{" "}
                 후 Cloudflare 주소 사용
               </li>

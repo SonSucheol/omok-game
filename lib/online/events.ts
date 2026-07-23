@@ -50,10 +50,6 @@ export interface UndoCancelPayload {
   requestId: string;
 }
 
-export interface AuthPresencePayload {
-  playerId: string;
-}
-
 export interface InviteSendPayload {
   playerId: string;
   toNickname?: string;
@@ -106,10 +102,6 @@ export interface ServerToClientEvents {
 }
 
 export interface ClientToServerEvents {
-  "presence:auth": (
-    payload: AuthPresencePayload,
-    ack: (response: { ok: boolean }) => void,
-  ) => void;
   "room:create": (
     payload: CreateRoomPayload,
     ack: (response: RoomActionResponse) => void,

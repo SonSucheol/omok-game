@@ -42,7 +42,7 @@ npm run dev
 | 변수 | 설명 |
 |------|------|
 | `PORT` | 서버 포트 (기본 `3000`) |
-| `HOSTNAME` | 바인딩 주소 (기본 `0.0.0.0`) |
+| `BIND_HOST` | 바인딩 주소 (기본 `0.0.0.0`) |
 | `NEXT_PUBLIC_SOCKET_URL` | 터널/도메인 접속 시 소켓 URL (비우면 현재 origin 사용) |
 
 ## 프로젝트 구조
@@ -54,9 +54,12 @@ hooks/         # 클라이언트 훅
 lib/           # 게임·AI·인증·온라인·기록 로직
 scripts/       # 개발 유틸 (LAN URL, 터널, fresh 재시작)
 server.ts      # Next + Socket.IO 커스텀 서버
+docs/          # 기술 문서
 ```
 
 대국 기록·계정 데이터는 `data/`에 JSON으로 저장되며 Git에 포함되지 않습니다.
+
+아키텍처·모듈·데이터 흐름의 자세한 설명은 [docs/TECHNICAL.md](docs/TECHNICAL.md)(기술소개서)를 참고하세요.
 
 ## 라이선스
 

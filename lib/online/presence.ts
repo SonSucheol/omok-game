@@ -60,9 +60,6 @@ export function createInvite(input: {
     delivered: false,
   };
   inviteStore().set(invite.id, invite);
-  console.log(
-    `[omok:invite] created id=${invite.id} ${invite.fromNickname} → ${invite.toNickname}`,
-  );
   return invite;
 }
 
@@ -101,30 +98,26 @@ export function listPendingInvitesForUser(userId: string): GameInvite[] {
 
 export function setUserPresence(userId: string, socketId: string): void {
   const store = presenceStore();
-  // 같은 유저의 이전 소켓 제거
   for (const [uid, sid] of store.entries()) {
     if (uid === userId || sid === socketId) {
       store.delete(uid);
     }
   }
   store.set(userId, socketId);
-  console.log(`[omok:login] presence ON userId=${userId} socketId=${socketId}`);
-}
-
-export function clearUserPresence(userId: string, socketId?: string): void {
-  const store = presenceStore();
-  const current = store.get(userId);
-  if (!current) {
-    return;
-  }
-  if (!socketId || current === socketId) {
-    store.delete(userId);
-    console.log(`[omok:login] presence OFF userId=${userId}`);
-  }
 }
 
 export function getUserSocketId(userId: string): string | undefined {
   return presenceStore().get(userId);
+}
+
+/** HTTP presence 등록만 된 경우 소켓→유저 역조회 */
+export function getUserIdBySocketId(socketId: string): string | null {
+  for (const [userId, sid] of presenceStore().entries()) {
+    if (sid === socketId) {
+      return userId;
+    }
+  }
+  return null;
 }
 
 export function clearPresenceBySocket(socketId: string): string | null {
@@ -132,36 +125,8 @@ export function clearPresenceBySocket(socketId: string): string | null {
   for (const [userId, sid] of store.entries()) {
     if (sid === socketId) {
       store.delete(userId);
-      console.log(`[omok:login] presence OFF userId=${userId} (disconnect)`);
       return userId;
     }
   }
   return null;
-}
-
-export function getPresenceDebug(): {
-  onlineUserIds: string[];
-  onlinePairs: { userId: string; socketId: string }[];
-  pendingInviteCount: number;
-  pendingInvites: { id: string; from: string; to: string }[];
-} {
-  const presence = presenceStore();
-  const invites = inviteStore();
-  return {
-    onlineUserIds: [...presence.keys()],
-    onlinePairs: [...presence.entries()].map(([userId, socketId]) => ({
-      userId,
-      socketId,
-    })),
-    pendingInviteCount: [...invites.values()].filter(
-      (i) => i.status === "pending",
-    ).length,
-    pendingInvites: [...invites.values()]
-      .filter((i) => i.status === "pending")
-      .map((i) => ({
-        id: i.id,
-        from: i.fromNickname,
-        to: i.toNickname,
-      })),
-  };
 }

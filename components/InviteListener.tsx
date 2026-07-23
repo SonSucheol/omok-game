@@ -7,41 +7,22 @@ import { useAuth } from "@/components/AuthProvider";
 import type { GameInvite } from "@/lib/online";
 
 interface PendingResponse {
-  loggedIn?: boolean;
   invites: GameInvite[];
-  debug?: {
-    me: string;
-    myUserId: string;
-    onlineUserIds: string[];
-    onlinePairs: { userId: string; socketId: string }[];
-    pendingInviteCount: number;
-    pendingInvites: { id: string; from: string; to: string }[];
-    iAmOnline: boolean;
-  };
-}
-
-function openInvite(invite: GameInvite, setInvite: (i: GameInvite) => void) {
-  console.log("[omok:invite] OPEN POPUP", invite);
-  setInvite(invite);
 }
 
 export function InviteListener() {
-  const { socket, connected, playerId, ready, presenceRegistered } =
-    useOmokSocket();
+  const { socket, playerId, ready } = useOmokSocket();
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   const [invite, setInvite] = useState<GameInvite | null>(null);
   const [inbox, setInbox] = useState<GameInvite[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [panelOpen, setPanelOpen] = useState(true);
-  const [debug, setDebug] = useState<PendingResponse["debug"] | null>(null);
   const seenIds = useRef(new Set<string>());
 
   const pullPending = useCallback(async () => {
     if (!user) {
       setInbox([]);
-      setDebug(null);
       return;
     }
     try {
@@ -49,55 +30,32 @@ export function InviteListener() {
         credentials: "include",
         cache: "no-store",
       });
-      const data = (await res.json()) as PendingResponse;
-      console.log("[omok:login] pending poll", {
-        status: res.status,
-        loggedIn: data.loggedIn,
-        count: data.invites?.length ?? 0,
-        debug: data.debug,
-      });
-
       if (!res.ok) {
         return;
       }
-
+      const data = (await res.json()) as PendingResponse;
       const list = data.invites ?? [];
       setInbox(list);
-      setDebug(data.debug ?? null);
 
-      // 새 초대가 있으면 즉시 팝업
       for (const item of list) {
         if (!seenIds.current.has(item.id)) {
           seenIds.current.add(item.id);
-          openInvite(item, setInvite);
+          setInvite(item);
           break;
         }
       }
 
-      // 팝업이 없고 대기 초대가 있으면 첫 건 표시
       setInvite((current) => {
         if (current) {
           return current;
         }
         return list[0] ?? null;
       });
-    } catch (e) {
-      console.warn("[omok:invite] pending poll failed", e);
+    } catch {
+      // 폴링 실패는 다음 주기에 재시도
     }
   }, [user]);
 
-  // 로그인 상태 로그
-  useEffect(() => {
-    console.log("[omok:login] InviteListener auth", {
-      authLoading,
-      loggedIn: Boolean(user),
-      nickname: user?.nickname ?? null,
-      socketConnected: connected,
-      presenceRegistered,
-    });
-  }, [user, authLoading, connected, presenceRegistered]);
-
-  // presence 등록 후 / 주기적으로 초대 폴링
   useEffect(() => {
     if (!user) {
       return;
@@ -107,18 +65,16 @@ export function InviteListener() {
       void pullPending();
     }, 2500);
     return () => window.clearInterval(timer);
-  }, [user, presenceRegistered, pullPending]);
+  }, [user, pullPending]);
 
-  // 소켓 실시간 수신
   useEffect(() => {
     if (!socket) {
       return;
     }
     const onInvite = (payload: { invite: GameInvite }) => {
-      console.log("[omok:invite] socket event invite:received", payload);
       seenIds.current.add(payload.invite.id);
       setError(null);
-      openInvite(payload.invite, setInvite);
+      setInvite(payload.invite);
       setInbox((prev) => {
         if (prev.some((i) => i.id === payload.invite.id)) {
           return prev;
@@ -132,7 +88,6 @@ export function InviteListener() {
       roomId?: string;
       message: string;
     }) => {
-      console.log("[omok:invite] socket event invite:resolved", payload);
       if (payload.accepted && payload.roomId) {
         router.push(`/online/room/${payload.roomId}`);
       }
@@ -147,22 +102,15 @@ export function InviteListener() {
 
   const respond = (accept: boolean) => {
     if (!socket || !ready || !invite) {
-      console.warn("[omok:invite] respond blocked", {
-        hasSocket: Boolean(socket),
-        ready,
-        hasInvite: Boolean(invite),
-      });
       return;
     }
     setBusy(true);
     setError(null);
-    console.log("[omok:invite] respond", { accept, inviteId: invite.id });
     socket.emit(
       "invite:respond",
       { playerId, inviteId: invite.id, accept },
       (response) => {
         setBusy(false);
-        console.log("[omok:invite] respond ack", response);
         if (!response.ok) {
           setError(
             response.error === "INVITER_OFFLINE"
@@ -180,95 +128,23 @@ export function InviteListener() {
     );
   };
 
-  if (authLoading) {
+  if (authLoading || !user) {
     return null;
-  }
-
-  // 게스트: 작은 상태만
-  if (!user) {
-    return (
-      <div className="fixed bottom-3 left-3 z-[9000] rounded-lg border border-stone-300 bg-white/95 px-2 py-1 text-[10px] text-stone-500 shadow-sm">
-        게스트 (초대 수신 불가)
-      </div>
-    );
   }
 
   return (
     <>
-      <div className="fixed bottom-3 right-3 z-[9000] flex max-w-[min(100vw-1.5rem,20rem)] flex-col items-end gap-2">
-        {inbox.length > 0 && (
+      {inbox.length > 0 && (
+        <div className="fixed bottom-3 right-3 z-[9000]">
           <button
             type="button"
-            onClick={() => openInvite(inbox[0]!, setInvite)}
+            onClick={() => setInvite(inbox[0]!)}
             className="animate-pulse rounded-full bg-amber-700 px-4 py-2 text-xs font-semibold text-white shadow-lg hover:bg-amber-800"
           >
-            대국 초대 {inbox.length}건 — 눌러서 확인
+            대국 초대 {inbox.length}건
           </button>
-        )}
-
-        <button
-          type="button"
-          onClick={() => {
-            setPanelOpen((v) => !v);
-            void pullPending();
-          }}
-          className={[
-            "rounded-lg border px-2.5 py-1.5 text-[11px] font-medium shadow-sm",
-            user && presenceRegistered
-              ? "border-emerald-300 bg-emerald-50 text-emerald-800"
-              : "border-amber-300 bg-amber-50 text-amber-900",
-          ].join(" ")}
-        >
-          {user.nickname} ·{" "}
-          {presenceRegistered ? "로그인·온라인" : "로그인·오프라인등록중"}
-          {inbox.length > 0 ? ` · 초대${inbox.length}` : ""}
-        </button>
-
-        {panelOpen && (
-          <div className="w-full rounded-xl border border-stone-200 bg-white p-3 text-[11px] text-stone-700 shadow-lg">
-            <p className="font-semibold text-stone-900">로그인 / 초대 상태</p>
-            <ul className="mt-2 space-y-1">
-              <li>1. HTTP 로그인: 예 ({user.nickname})</li>
-              <li>2. 소켓 연결: {connected ? "예" : "아니오"}</li>
-              <li>
-                3. Presence 등록: {presenceRegistered ? "예" : "아니오"}
-              </li>
-              <li>4. 대기 초대: {inbox.length}건</li>
-              {debug && (
-                <li>
-                  5. 서버 온라인 유저: {debug.onlineUserIds.length}명
-                  {debug.iAmOnline ? " (나 포함)" : " (나 없음!)"}
-                </li>
-              )}
-            </ul>
-            {inbox.length > 0 && (
-              <ul className="mt-2 border-t border-stone-100 pt-2">
-                {inbox.map((item) => (
-                  <li key={item.id} className="flex justify-between gap-2 py-1">
-                    <span>
-                      {item.fromNickname} → 나
-                    </span>
-                    <button
-                      type="button"
-                      className="font-medium text-amber-800 underline"
-                      onClick={() => openInvite(item, setInvite)}
-                    >
-                      열기
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-            <button
-              type="button"
-              className="mt-2 text-amber-800 underline"
-              onClick={() => void pullPending()}
-            >
-              상태 새로고침
-            </button>
-          </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {invite && (
         <div
@@ -278,10 +154,9 @@ export function InviteListener() {
           aria-labelledby="invite-dialog-title"
         >
           <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
-            <p className="text-xs font-medium text-amber-700">로그인 확인됨</p>
             <h2
               id="invite-dialog-title"
-              className="mt-1 text-lg font-semibold text-stone-900"
+              className="text-lg font-semibold text-stone-900"
             >
               대국 초대
             </h2>

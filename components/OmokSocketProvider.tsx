@@ -38,18 +38,9 @@ async function registerPresence(socketId: string): Promise<boolean> {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ socketId }),
     });
-    const data = (await res.json()) as {
-      ok?: boolean;
-      loggedIn?: boolean;
-      user?: { nickname: string };
-    };
-    console.log("[omok:login] client registerPresence", {
-      status: res.status,
-      ...data,
-    });
+    const data = (await res.json()) as { ok?: boolean };
     return Boolean(res.ok && data.ok);
-  } catch (e) {
-    console.warn("[omok:login] registerPresence failed", e);
+  } catch {
     return false;
   }
 }
@@ -64,15 +55,6 @@ export function OmokSocketProvider({ children }: { children: ReactNode }) {
   const [presenceRegistered, setPresenceRegistered] = useState(false);
 
   const authKey = authLoading ? "loading" : (user?.id ?? "guest");
-
-  useEffect(() => {
-    console.log("[omok:login] AuthProvider state", {
-      authLoading,
-      loggedIn: Boolean(user),
-      nickname: user?.nickname ?? null,
-      userId: user?.id ?? null,
-    });
-  }, [user, authLoading]);
 
   useEffect(() => {
     if (authLoading) {
@@ -99,11 +81,6 @@ export function OmokSocketProvider({ children }: { children: ReactNode }) {
       setConnected(true);
       setConnectError(null);
       setReady(true);
-      console.log("[omok:login] socket connected", {
-        socketId: instance.id,
-        authKey,
-        loggedIn: Boolean(user),
-      });
 
       if (user && instance.id) {
         void registerPresence(instance.id).then((ok) => {
@@ -111,21 +88,18 @@ export function OmokSocketProvider({ children }: { children: ReactNode }) {
         });
       } else {
         setPresenceRegistered(false);
-        console.log("[omok:login] guest — presence skip");
       }
     };
 
     const onDisconnect = () => {
       setConnected(false);
       setPresenceRegistered(false);
-      console.log("[omok:login] socket disconnected");
     };
 
     const onConnectError = (error: Error) => {
       setConnected(false);
       setReady(true);
       setConnectError(error.message || "서버 연결에 실패했습니다.");
-      console.warn("[omok:login] socket connect_error", error.message);
     };
 
     instance.on("connect", onConnect);
@@ -142,19 +116,9 @@ export function OmokSocketProvider({ children }: { children: ReactNode }) {
       instance.off("connect_error", onConnectError);
       instance.disconnect();
     };
-    // user nickname only for logging; authKey drives reconnect
+    // authKey 변경 시 재연결 (로그인/로그아웃)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authKey, authLoading]);
-
-  // 로그인 직후 소켓이 이미 연결된 경우 presence 재등록
-  useEffect(() => {
-    if (!user || !socket?.connected || !socket.id) {
-      return;
-    }
-    void registerPresence(socket.id).then((ok) => {
-      setPresenceRegistered(ok);
-    });
-  }, [user, socket, connected]);
 
   const value = useMemo(
     () => ({

@@ -33,7 +33,7 @@ import {
   clearPresenceBySocket,
   createInvite,
   getInvite,
-  getPresenceDebug,
+  getUserIdBySocketId,
   getUserSocketId,
   listPendingInvitesForUser,
   markInviteDelivered,
@@ -84,7 +84,6 @@ function deliverPendingInvites(io: OmokServer, userId: string, socketId: string)
     const ok = emitToSocketId(io, socketId, "invite:received", { invite });
     if (ok) {
       markInviteDelivered(invite.id);
-      console.log(`[invite] delivered pending ${invite.id} → ${userId}`);
     }
   }
 }
@@ -200,31 +199,10 @@ function identityFrom(
 export function setupSocketHandlers(io: OmokServer): void {
   io.on("connection", (socket: OmokSocket) => {
     const user = resolveSocketUser(socket, true);
-    console.log(
-      `[socket] connect id=${socket.id} user=${user?.nickname ?? "guest"} cookie=${Boolean(socket.handshake.headers.cookie)}`,
-      getPresenceDebug(),
-    );
     if (user) {
       setUserPresence(user.id, socket.id);
       deliverPendingInvites(io, user.id, socket.id);
     }
-
-    socket.on("presence:auth", (_payload, ack) => {
-      // 로그인 직후 재연결 전에도 쿠키가 핸드셰이크에 있으면 여기서 등록
-      const next = resolveSocketUser(socket, true);
-      if (next) {
-        setUserPresence(next.id, socket.id);
-        deliverPendingInvites(io, next.id, socket.id);
-        console.log(
-          `[presence:auth] ok user=${next.nickname}`,
-          getPresenceDebug(),
-        );
-        ack({ ok: true });
-        return;
-      }
-      console.log(`[presence:auth] fail socket=${socket.id}`, getPresenceDebug());
-      ack({ ok: false });
-    });
 
     socket.on("room:create", (payload, ack) => {
       const { playerId } = payload;
@@ -270,28 +248,20 @@ export function setupSocketHandlers(io: OmokServer): void {
       // 1) 소켓 쿠키 또는 2) presence에 이미 등록된 소켓으로 발신자 확인
       let user = resolveSocketUser(socket, true);
       if (!user) {
-        // HTTP presence 등록만 된 경우: 이 소켓이 누구 것인지 presence에서 역조회
-        const debug = getPresenceDebug();
-        const pair = debug.onlinePairs.find((p) => p.socketId === socket.id);
-        if (pair) {
-          const found = getUserById(pair.userId);
+        const presenceUserId = getUserIdBySocketId(socket.id);
+        if (presenceUserId) {
+          const found = getUserById(presenceUserId);
           if (found) {
             user = found;
             socket.data.user = found;
-            console.log(
-              `[omok:login] invite:send recovered user from presence ${found.nickname}`,
-            );
           }
         }
       }
 
       if (!user) {
-        console.log("[omok:invite] send UNAUTHORIZED", getPresenceDebug());
         ack(errorResponse("UNAUTHORIZED"));
         return;
       }
-
-      console.log(`[omok:login] invite sender OK ${user.nickname}(${user.id})`);
 
       const target = payload.toUserId
         ? getUserById(payload.toUserId)
@@ -326,24 +296,14 @@ export function setupSocketHandlers(io: OmokServer): void {
       });
 
       const targetSocketId = getUserSocketId(target.id);
-      let delivered = false;
       if (targetSocketId) {
-        delivered = emitToSocketId(io, targetSocketId, "invite:received", {
+        const delivered = emitToSocketId(io, targetSocketId, "invite:received", {
           invite,
         });
         if (delivered) {
           markInviteDelivered(invite.id);
         }
       }
-
-      console.log(`[omok:invite] send result`, {
-        from: user.nickname,
-        to: target.nickname,
-        inviteId: invite.id,
-        targetSocketId: targetSocketId ?? null,
-        delivered,
-        debug: getPresenceDebug(),
-      });
 
       ack({
         ok: true,
@@ -383,14 +343,12 @@ export function setupSocketHandlers(io: OmokServer): void {
             message: `${user.nickname}님이 초대를 거절했습니다.`,
           });
         }
-        console.log(`[invite:respond] declined by ${user.nickname}`);
         ack({ ok: true });
         return;
       }
 
       if (!inviterSocketId) {
         updateInviteStatus(invite.id, "cancelled");
-        console.log("[invite:respond] INVITER_OFFLINE");
         ack(errorResponse("INVITER_OFFLINE"));
         return;
       }
@@ -435,10 +393,6 @@ export function setupSocketHandlers(io: OmokServer): void {
       if (inviterSnapshot) {
         emitToSocketId(io, inviterSocketId, "room:state", inviterSnapshot);
       }
-
-      console.log(
-        `[invite:respond] accepted room=${room.id} by ${user.nickname}`,
-      );
 
       ack({
         ok: true,
